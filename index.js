@@ -1,89 +1,103 @@
-// Install dependencies:
-// npm install express axios node-cache
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+const crypto = require('crypto');
 
-const express = require('express');
-const axios = require('axios');
-const NodeCache = require('node-cache');
-
-const app = express();
-const port = 3000;
-
-// Cache: 1 hour TTL
-const cache = new NodeCache({ stdTTL: 3600 });
+// In-memory cache: { [path]: { timestamp, headers, body } }
+const cache = {};
+const TTL = 3600 * 1000; // 1 hour
 const ORIGIN = 'https://pub-ad6cd63cac2b4eb7b32b6806a1af5f09.r2.dev';
 
-app.get('/*', async (req, res) => {
-  const path = req.params[0];
-  const targetUrl = `${ORIGIN}/${path}`;
+const server = http.createServer(async (req, res) => {
+  const reqPath = decodeURIComponent(req.url);
+  const targetUrl = ORIGIN + reqPath;
 
   // Check cache
-  if (cache.has(path)) {
-    const cached = cache.get(path);
-    res.set(cached.headers);
-    return res.status(200).send(cached.data);
+  const now = Date.now();
+  if (cache[reqPath] && now - cache[reqPath].timestamp < TTL) {
+    const { headers, body } = cache[reqPath];
+    res.writeHead(200, headers);
+    return res.end(body);
   }
 
   try {
-    const response = await axios.get(targetUrl, {
-      responseType: 'arraybuffer', // support binary files
-      headers: {
-        'User-Agent': 'Node-Proxy-Cache',
-      },
-      validateStatus: () => true, // Allow all statuses
-    });
+    const data = await proxyFetch(targetUrl);
 
-    const { status, data, headers } = response;
-
-    if (status >= 400) {
-      return res.status(status).send(getCustomErrorPage(status));
+    if (data.status >= 400) {
+      res.writeHead(data.status, { 'Content-Type': 'text/html' });
+      return res.end(getCustomErrorPage(data.status));
     }
 
-    // Store in cache
-    cache.set(path, {
-      data,
+    // Cache it
+    cache[reqPath] = {
+      timestamp: now,
       headers: {
-        'Content-Type': headers['content-type'] || 'application/octet-stream',
+        'Content-Type': data.headers['content-type'] || 'application/octet-stream',
         'Cache-Control': 'public, max-age=3600',
-      }
-    });
+      },
+      body: data.body,
+    };
 
-    res.set({
-      'Content-Type': headers['content-type'] || 'application/octet-stream',
-      'Cache-Control': 'public, max-age=3600',
-    });
-
-    return res.send(data);
+    res.writeHead(200, cache[reqPath].headers);
+    res.end(cache[reqPath].body);
   } catch (err) {
-    return res.status(500).send(getCustomErrorPage(500, err));
+    res.writeHead(500, { 'Content-Type': 'text/html' });
+    res.end(getCustomErrorPage(500, err));
   }
 });
 
-// Error page generator
-function getCustomErrorPage(status, err) {
-  const titles = {
+server.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});
+
+function proxyFetch(urlStr) {
+  const url = new URL(urlStr);
+  const lib = url.protocol === 'https:' ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const req = lib.get(url, {
+      headers: {
+        'User-Agent': 'Node-Proxy-Cache',
+      }
+    }, res => {
+      const status = res.statusCode;
+      const headers = res.headers;
+      const chunks = [];
+
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => {
+        resolve({
+          status,
+          headers,
+          body: Buffer.concat(chunks)
+        });
+      });
+    });
+
+    req.on('error', reject);
+  });
+}
+
+function getCustomErrorPage(status, err = null) {
+  const messages = {
     400: "400 Bad Request",
     401: "401 Unauthorized",
     403: "403 Forbidden",
     404: "404 Not Found",
     500: "500 Internal Server Error",
   };
-  const msg = titles[status] || `${status} Error`;
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head><title>${msg}</title><style>
-      body { font-family: sans-serif; background: #111; color: #eee; padding: 2em; }
-      h1 { color: #f55; }
-    </style></head>
-    <body>
-      <h1>${msg}</h1>
-      <p>${err ? "Details: " + err.message : "The requested content could not be retrieved."}</p>
-    </body>
-    </html>
-  `;
+  const msg = messages[status] || `${status} Error`;
+
+  return `<!DOCTYPE html>
+<html>
+<head><title>${msg}</title><style>
+  body { font-family: sans-serif; background: #111; color: #eee; padding: 2em; }
+  h1 { color: #f55; }
+</style></head>
+<body>
+  <h1>${msg}</h1>
+  <p>${err ? 'Details: ' + err.message : 'The requested content could not be retrieved.'}</p>
+</body>
+</html>`;
 }
-
-app.listen(port, () => {
-  console.log(`Proxy running on http://localhost:${port}`);
-});
