@@ -12,7 +12,6 @@ const R2_BUCKET = 'chatlogs';
 // --- Server Configuration ---
 const PREFIX = '/n9swecrlthotr7w8am/';
 const SIGNED_URL_EXPIRES_IN = 300; // Time in seconds (e.g., 300 = 5 minutes)
-const CORS_PROXY_PREFIX = 'https://cors.jdx3.org/'; // CORS proxy prefix
 
 // Initialize the S3 client for R2
 const s3Client = new S3Client({
@@ -54,12 +53,9 @@ const server = http.createServer(async (req, res) => {
       expiresIn: SIGNED_URL_EXPIRES_IN,
     });
 
-    // Prepend the CORS proxy to the signed URL
-    const proxiedUrl = CORS_PROXY_PREFIX + signedUrl;
-
-    // Redirect the client to the proxied pre-signed URL
+    // Redirect the client to the pre-signed URL
     setCORSHeaders(res);
-    res.setHeader('Location', proxiedUrl);
+    res.setHeader('Location', signedUrl);
     res.writeHead(302); // 302 Found (Temporary Redirect)
     res.end();
 
@@ -73,7 +69,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(3000, () => {
-  console.log(`Redirect server running. Accessing a URL will generate a proxied R2 link.`);
+  console.log(`Redirect server running. Accessing a URL will generate a signed R2 link.`);
   console.log(`http://localhost:3000${PREFIX}:object-key`);
 });
 
@@ -96,6 +92,7 @@ function setCORSHeaders(res) {
 function getCustomErrorPage(status, err = null) {
   const messages = {
     403: "403 Forbidden",
+    404: "404 Not Found", // Note: 404s will happen on the R2 side, not here.
     500: "500 Internal Server Error",
   };
 
