@@ -3,11 +3,11 @@ const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // --- R2 Configuration ---
-const R2_ENDPOINT = 'https://e369a3f4ccd7949a39e767db20807cb5.r2.cloudflarestorage.com';
-const R2_ACCESS_KEY_ID = '00dc6cfaa4e288a07e0ae6a0038c0361';
-const R2_SECRET_ACCESS_KEY = '24e9d7f5248ccadd1bad13ee7a47cfcd1cc44847da1d9084a73bb61f3d3cbc43';
-const R2_REGION = 'auto';
-const R2_BUCKET = 'chatlogs';
+const R2_ENDPOINT = 'https://fa24299a379407555abf6183bef56edc.r2.cloudflarestorage.com'
+const R2_ACCESS_KEY_ID = '37fb7a859d92cf504bc308577c2cd855'
+const R2_SECRET_ACCESS_KEY = '79c06ec1920d082559b07b62c7f609bc58524f829817a0b3d4661d9807182b99'
+const R2_REGION = 'auto'
+const R2_BUCKET = 'tuulip'
 
 // --- Server Configuration ---
 const PREFIX = '/n9swecrlthotr7w8am/';
