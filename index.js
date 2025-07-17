@@ -10,7 +10,7 @@ const R2_REGION = 'auto'
 const R2_BUCKET = 'bone'
 
 // --- Server Configuration ---
-const PREFIX = '/n9swecrlthotr7w8am/';
+const PREFIX = '/';
 const SIGNED_URL_EXPIRES_IN = 300; // Time in seconds (e.g., 300 = 5 minutes)
 
 // Initialize the S3 client for R2
